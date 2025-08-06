@@ -1,4 +1,4 @@
-print("Starting PEFT adapter training...")
+print("Starting protein property classification with LoRA adapter...")
 
 try:
     from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer
@@ -8,16 +8,19 @@ try:
 
     # Load dataset
     print("Loading dataset...")
-    dataset = load_dataset("csv", data_files="data/pdb_data_seq.csv")
+    dataset = load_dataset("csv", data_files="data/training_database.csv")
 
     # Rename columns
-    print("Renaming columns...")
-    dataset = dataset.rename_column("sequence", "text")
-    dataset = dataset.rename_column("macromoleculeType", "label")
+    print("Renaming and selecting relevant columns...")
+    dataset = dataset.rename_column("Amino_Acid_Sequence", "text")
+    dataset = dataset.rename_column("Predicted_Stability", "label")
+    
+    keep_columns = ["text", "label"]
+    dataset = dataset["train"].remove_columns([col for col in dataset["train"].column_names if col not in keep_columns])
 
     # Split dataset
     print("Splitting dataset...")
-    dataset = dataset["train"].train_test_split(test_size=0.2)
+    dataset = dataset.train_test_split(test_size=0.2)
     train_dataset = dataset["train"]
     eval_dataset = dataset["test"]
 
@@ -33,15 +36,15 @@ try:
     train_dataset = train_dataset.map(encode_labels)
     eval_dataset = eval_dataset.map(encode_labels)
 
-    # Filter out invalid text entries
+    # Filter valid text entries
     def is_valid_text(example):
-        return example["text"] is not None and isinstance(example["text"], str)
+        return example["text"] and isinstance(example["text"], str)
 
     print("Cleaning dataset...")
     train_dataset = train_dataset.filter(is_valid_text)
     eval_dataset = eval_dataset.filter(is_valid_text)
 
-    # Load tokenizer and model
+    # Load tokenizer and base model
     print("Loading model and tokenizer...")
     model_name = "bert-base-uncased"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -57,14 +60,15 @@ try:
     )
     model = get_peft_model(model, peft_config)
 
-    # Tokenize
-    print("Tokenizing dataset...")
+    # Tokenize sequences
+    print("Tokenizing sequences...")
     def tokenize_function(example):
         return tokenizer(example["text"], padding="max_length", truncation=True)
 
     tokenized_train = train_dataset.map(tokenize_function, batched=True)
     tokenized_eval = eval_dataset.map(tokenize_function, batched=True)
 
+    # Training setup
     training_args = TrainingArguments(
         output_dir="./results",
         do_eval=True,
@@ -77,7 +81,7 @@ try:
         logging_steps=10,
     )
 
-    # Trainer
+    # Trainer initialization
     print("Starting training...")
     trainer = Trainer(
         model=model,
