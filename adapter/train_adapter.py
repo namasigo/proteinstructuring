@@ -8,7 +8,7 @@ try:
 
     # Load dataset
     print("Loading dataset...")
-    dataset = load_dataset("csv", data_files="data/training_database.csv")
+    dataset = load_dataset("csv", data_files="data/training_database.csv", delimiter=";")
 
     # Rename columns
     print("Renaming and selecting relevant columns...")
