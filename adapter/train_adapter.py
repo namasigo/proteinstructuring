@@ -5,6 +5,7 @@ try:
     from datasets import load_dataset
     from peft import get_peft_model, LoraConfig, TaskType
     import torch
+    import os
 
     # Load dataset
     print("Loading dataset...")
@@ -28,6 +29,7 @@ try:
     unique_labels = list(set(train_dataset["label"]))
     print("Unique labels:", unique_labels)
     label_to_id = {label: idx for idx, label in enumerate(unique_labels)}
+    id_to_label = {v: k for k, v in label_to_id.items()}
 
     def encode_labels(example):
         example["label"] = label_to_id[example["label"]]
@@ -92,6 +94,22 @@ try:
 
     trainer.train()
     print("Training complete!")
+
+    # Evaluate model
+    print("Evaluating on test data...")
+    eval_results = trainer.evaluate()
+    print("Evaluation results:", eval_results)
+
+    # Predict single new sequence
+    sample_sequence = "MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHF"
+    print("Running prediction on new sequence:")
+    inputs = tokenizer(sample_sequence, return_tensors="pt", padding="max_length", truncation=True)
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+        predicted_class = torch.argmax(outputs.logits, dim=1).item()
+
+    print("Predicted Stability:", id_to_label[predicted_class])
 
 except Exception as e:
     print(f"Error: {e}")
