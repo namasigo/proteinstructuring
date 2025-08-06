@@ -95,6 +95,13 @@ try:
     trainer.train()
     print("Training complete!")
 
+    # Save adapter and tokenizer
+    save_path = "./adapter_model"
+    model.save_pretrained(save_path)
+    tokenizer.save_pretrained(save_path)
+    print(f"Adapter and tokenizer saved to {save_path}")
+
+
     # Evaluate model
     print("Evaluating on test data...")
     eval_results = trainer.evaluate()

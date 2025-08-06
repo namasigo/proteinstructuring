@@ -3,17 +3,25 @@
 from transformers import BertTokenizer, BertForSequenceClassification
 from peft import PeftModel
 import torch
+import os
 
-# Load model and tokenizer
+# Paths
 base_model_name = "bert-base-uncased"
-model_path = "./adapter_model"  # Update if your fine-tuned model is elsewhere
+adapter_path = "../adapter/adapter_model"  # Adjust if needed
 
+# Check that adapter config exists
+if not os.path.exists(os.path.join(adapter_path, "adapter_config.json")):
+    raise FileNotFoundError(f"Adapter config not found in {adapter_path}. Make sure to save adapter properly after training.")
+
+# Load tokenizer and base model
 tokenizer = BertTokenizer.from_pretrained(base_model_name)
 base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_labels=2)
-model = PeftModel.from_pretrained(base_model, model_path)
+
+# Load LoRA adapter
+model = PeftModel.from_pretrained(base_model, adapter_path)
 model.eval()
 
-# Define prediction function
+# Prediction function
 def predict_stability(sequence):
     inputs = tokenizer(sequence, return_tensors="pt", truncation=True, padding=True)
     with torch.no_grad():
@@ -24,12 +32,7 @@ def predict_stability(sequence):
 
 # Example usage
 if __name__ == "__main__":
-    test_sequence = "MKTFFVLLLTLVVVTIVCLDLGYT"  # Replace with your own sequence
+    test_sequence = "MKTFFVLLLTLVVVTIVCLDLGYT"  # Replace this with any sequence you want
     result = predict_stability(test_sequence)
-    print(f"Sequence: {test_sequence}")
-    print(f"Predicted Stability: {result}")
-if __name__ == "__main__":
-    test_sequence = "MKTFFVLLLTLVVVTIVCLDLGYT"  # Example sequence
-    result = predict_stability(test_sequence)
-    print(f"Sequence: {test_sequence}")
-    print(f"Predicted Stability: {result}")
+    print(f"\n🧬 Sequence: {test_sequence}")
+    print(f"🧪 Predicted Stability: {result}\n")
