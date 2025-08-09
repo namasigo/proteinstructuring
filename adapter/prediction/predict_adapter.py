@@ -1,38 +1,45 @@
-# predict_adapter.py
-
-from transformers import BertTokenizer, BertForSequenceClassification
-from peft import PeftModel
-import torch
 import os
+import warnings
+from transformers import BertTokenizer, BertForSequenceClassification, AdapterConfig, AdapterType
+import torch
 
-# Paths
-base_model_name = "bert-base-uncased"
-adapter_path = "../adapter/adapter_model"  # Adjust if needed
+# Suppress warnings (like the classifier init warning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
-# Check that adapter config exists
-if not os.path.exists(os.path.join(adapter_path, "adapter_config.json")):
+# Dynamically resolve the adapter path
+base_path = os.path.dirname(__file__)
+adapter_path = os.path.join(base_path, "..", "adapter_model")
+
+# Confirm the config exists
+config_path = os.path.join(adapter_path, "adapter_config.json")
+if not os.path.exists(config_path):
     raise FileNotFoundError(f"Adapter config not found in {adapter_path}. Make sure to save adapter properly after training.")
 
 # Load tokenizer and base model
-tokenizer = BertTokenizer.from_pretrained(base_model_name)
-base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_labels=2)
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
 
-# Load LoRA adapter
-model = PeftModel.from_pretrained(base_model, adapter_path)
+# Load adapter
+model.load_adapter(adapter_path, AdapterType.text_task, load_as="stability_adapter")
+model.set_active_adapters("stability_adapter")
 model.eval()
 
-# Prediction function
-def predict_stability(sequence):
-    inputs = tokenizer(sequence, return_tensors="pt", truncation=True, padding=True)
-    with torch.no_grad():
-        outputs = model(**inputs)
-    logits = outputs.logits
-    prediction = torch.argmax(logits, dim=1).item()
-    return "Stable" if prediction == 0 else "Unstable"
+# Input sequence for prediction
+sequence = "MKTFFVLLLTLVVVTIVCLDLGYT"
 
-# Example usage
-if __name__ == "__main__":
-    test_sequence = "MKTFFVLLLTLVVVTIVCLDLGYT"  # Replace this with any sequence you want
-    result = predict_stability(test_sequence)
-    print(f"\n🧬 Sequence: {test_sequence}")
-    print(f"🧪 Predicted Stability: {result}\n")
+# Tokenize input
+inputs = tokenizer(sequence, return_tensors="pt", truncation=True, padding=True)
+
+# Predict
+with torch.no_grad():
+    outputs = model(**inputs)
+    logits = outputs.logits
+    predicted_class = torch.argmax(logits, dim=1).item()
+
+# Decode label
+label_map = {0: "Unstable", 1: "Stable"}  # adjust if your label mapping is different
+predicted_label = label_map.get(predicted_class, "Unknown")
+
+# Output result
+print(f"Sequence: {sequence}")
+print(f"Predicted Stability: {predicted_label}")
